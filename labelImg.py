@@ -1300,8 +1300,8 @@ class MainWindow(QMainWindow, WindowMixin):
         assert not self.filePath is None
 
         image = read_image_bgr(self.filePath)
-        draw = image.copy()
-        draw = cv2.cvtColor(draw, cv2.COLOR_BGR2RGB)
+        #draw = image.copy()
+        #draw = cv2.cvtColor(draw,cv2.COLOR_BGR2RGB)
 
         image = preprocess_image(image)
         image, scale = resize_image(image)
@@ -1309,7 +1309,8 @@ class MainWindow(QMainWindow, WindowMixin):
         boxes, scores, labels = model.predict_on_batch(np.expand_dims(image, axis=0))
         print("processing time:", time.time()-start)
 
-        #correct for image scale
+        shapes = []
+        #correct for image scale        
         boxes /= scale
         for box, score, label in zip(boxes[0], scores[0], labels[0]):
             if score < 0.5:
@@ -1317,12 +1318,26 @@ class MainWindow(QMainWindow, WindowMixin):
             
             color = label_color(label)
             b = box.astype(int)
-            draw_box(draw, b, color=color)
+            #draw_box(draw, b, color=color)
 
+            text = labels_to_name[label]
             caption = "{} {:.3f}".format(labels_to_name[label], score)
-            draw_caption(draw, b, caption)
+            #draw_caption(draw, b, caption)
+            xmin = b[0]
+            ymin = b[1]
+            xmax = b[2]
+            ymax = b[3]
+            points = [(xmin,ymin), (xmax, ymin), (xmax, ymax), (xmin,ymax)]
+            #shapes.append((label, points, label, label, False))
+            shape = (labels_to_name[label], points, None, None, False)
+            shapes.append(shape)
         
-        cv2.imshow('draw', draw)
+        if len(shapes) > 0:  
+            self.itemsToShapes.clear()
+            self.shapesToItems.clear()
+            self.labelList.clear()          
+            self.loadLabels(shapes)
+            self.setDirty()
 
 
     def saveFile(self, _value=False):
