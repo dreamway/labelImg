@@ -1310,6 +1310,7 @@ class MainWindow(QMainWindow, WindowMixin):
         print("processing time:", time.time()-start)
 
         shapes = []
+        predict_captions = []
         #correct for image scale        
         boxes /= scale
         for box, score, label in zip(boxes[0], scores[0], labels[0]):
@@ -1331,8 +1332,14 @@ class MainWindow(QMainWindow, WindowMixin):
             #shapes.append((label, points, label, label, False))
             shape = (labels_to_name[label], points, None, None, False)
             shapes.append(shape)
+            predict_captions.append(caption)
         
         if len(shapes) > 0:  
+            msg = "Predict: "
+            for caption in predict_captions:
+                msg += caption+"; "
+            self.status(msg)
+
             self.itemsToShapes.clear()
             self.shapesToItems.clear()
             self.labelList.clear()          
