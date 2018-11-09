@@ -45,6 +45,19 @@ from libs.yolo_io import TXT_EXT
 from libs.ustr import ustr
 from libs.version import __version__
 
+# Keras-retinanet model related
+import keras
+from keras_retinanet import models
+from keras_retinanet.utils.image import read_image_bgr, preprocess_image, resize_image
+from keras_retinanet.utils.visualization import draw_box, draw_caption
+from keras_retinanet.utils.colors import label_color
+import os
+import numpy as np
+import time
+import tensorflow as tf
+import cv2
+
+   
 __appname__ = 'labelImg'
 
 # Utility functions and classes.
@@ -56,6 +69,23 @@ def have_qstring():
 def util_qt_strlistclass():
     return QStringList if have_qstring() else list
 
+def get_session():
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    return tf.Session(config=config)
+
+keras.backend.tensorflow_backend.set_session(get_session())
+model_path = os.path.join('weights', 'keras-retinanet-d50-bs4-model.h5')
+model = models.load_model(model_path, backbone_name='resnet50')
+print(model.summary())
+
+labels_to_name = {
+    0:'background',
+    1:'component',
+    2:'drawback1-little',
+    3:'drawback2-damage',
+    4:'drawback3-notes'
+}
 
 class WindowMixin(object):
 
@@ -268,6 +298,8 @@ class MainWindow(QMainWindow, WindowMixin):
                               'Ctrl+Shift+A', 'expert', u'Switch to advanced mode',
                               checkable=True)
 
+        predict = action('&Predict', self.predict, 'p', 'predict', u'predict the image using model', enabled=True)
+
         hideAll = action('&Hide\nRectBox', partial(self.togglePolygons, False),
                          'Ctrl+H', 'hide', u'Hide all Boxs',
                          enabled=False)
@@ -333,7 +365,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.popLabelListMenu)
 
         # Store actions for further handling.
-        self.actions = struct(save=save, save_format=save_format, saveAs=saveAs, open=open, close=close, resetAll = resetAll,
+        self.actions = struct(save=save, save_format=save_format, saveAs=saveAs, open=open, close=close, predict=predict, resetAll = resetAll,
                               lineColor=color1, create=create, delete=delete, edit=edit, copy=copy,
                               createMode=createMode, editMode=editMode, advancedMode=advancedMode,
                               shapeLineColor=shapeLineColor, shapeFillColor=shapeFillColor,
@@ -399,11 +431,11 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.tools = self.toolbar('Tools')
         self.actions.beginner = (
-            open, opendir, changeSavedir, openNextImg, openPrevImg, verify, save, save_format, None, create, copy, delete, None,
+            open, opendir, changeSavedir, predict, openNextImg, openPrevImg, verify, save, save_format, None, create, copy, delete, None,
             zoomIn, zoom, zoomOut, fitWindow, fitWidth)
 
         self.actions.advanced = (
-            open, opendir, changeSavedir, openNextImg, openPrevImg, save, save_format, None,
+            open, opendir, changeSavedir, predict, openNextImg, openPrevImg, save, save_format, None,
             createMode, editMode, None,
             hideAll, showAll)
 
@@ -1262,6 +1294,36 @@ class MainWindow(QMainWindow, WindowMixin):
             if isinstance(filename, (tuple, list)):
                 filename = filename[0]
             self.loadFile(filename)
+
+    def predict(self):
+        print("predict action triggered")
+        assert not self.filePath is None
+
+        image = read_image_bgr(self.filePath)
+        draw = image.copy()
+        draw = cv2.cvtColor(draw, cv2.COLOR_BGR2RGB)
+
+        image = preprocess_image(image)
+        image, scale = resize_image(image)
+        start = time.time()
+        boxes, scores, labels = model.predict_on_batch(np.expand_dims(image, axis=0))
+        print("processing time:", time.time()-start)
+
+        #correct for image scale
+        boxes /= scale
+        for box, score, label in zip(boxes[0], scores[0], labels[0]):
+            if score < 0.5:
+                break
+            
+            color = label_color(label)
+            b = box.astype(int)
+            draw_box(draw, b, color=color)
+
+            caption = "{} {:.3f}".format(labels_to_name[label], score)
+            draw_caption(draw, b, caption)
+        
+        cv2.imshow('draw', draw)
+
 
     def saveFile(self, _value=False):
         if self.defaultSaveDir is not None and len(ustr(self.defaultSaveDir)):
