@@ -75,9 +75,13 @@ def get_session():
     return tf.Session(config=config)
 
 keras.backend.tensorflow_backend.set_session(get_session())
-model_path = os.path.join('weights', 'keras-retinanet-d50-bs4-model.h5')
-model = models.load_model(model_path, backbone_name='resnet50')
-print(model.summary())
+#model_path = os.path.join('weights', 'keras-retinanet-d50-bs4-model.h5')
+#model_path = os.path.join('weights', 'retinanet50_train090_val046.h5')
+
+def load_model(model_path):
+    model_path = os.path.join('weights', 'retinanet50_train080_val055.h5')
+    model = models.load_model(model_path, backbone_name='resnet50')
+    print(model.summary())
 
 labels_to_name = {
     0:'background',
@@ -299,7 +303,7 @@ class MainWindow(QMainWindow, WindowMixin):
                               'Ctrl+Shift+A', 'expert', u'Switch to advanced mode',
                               checkable=True)
 
-        predict = action('&Predict', self.predict, 'p', 'predict', u'predict the image using model', enabled=True)
+        predict = action('&Predict', self.predict, 'Space', 'predict', u'predict the image using model', enabled=True)
 
         hideAll = action('&Hide\nRectBox', partial(self.togglePolygons, False),
                          'Ctrl+H', 'hide', u'Hide all Boxs',
@@ -1364,6 +1368,9 @@ class MainWindow(QMainWindow, WindowMixin):
             self.labelList.clear()          
             self.loadLabels(shapes)
             self.setDirty()
+        else:
+            msg = 'non prediction for '+self.filePath
+            self.status(msg)
 
 
     def saveFile(self, _value=False):
